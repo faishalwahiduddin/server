@@ -1,0 +1,28 @@
+node_modules/
+.svelte-kit/
+.wrangler/
+.generated/
+.env
+.env.*
+!.env.example
+dist/
+build/
+.dev.vars
+!.dev.vars.example
+.claude/
+test-results/
+playwright-report/
+tests/e2e/.auth/
+coverage/
+.omc/
+.omo/
+.sisyphus/
+.gstack/
+.DS_Store
+*.trace.zip
+
+# >>> repo-layout standard (docs/standards.md §ORG) >>>
+# QA & test artefacts — never committed
+qa-*/
+screenshots/
+# <<< repo-layout standard <<<

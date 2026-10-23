@@ -1,0 +1,6 @@
+name = "server-faishal"
+pages_build_output_dir = ".svelte-kit/cloudflare"
+compatibility_date = "2026-07-19"
+compatibility_flags = ["nodejs_compat"]
+
+# No bindings: local-first shell, no D1/R2/AI. No Access vars (public shell, simulation-only).

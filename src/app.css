@@ -1,0 +1,77 @@
+@import 'tailwindcss';
+
+:root {
+	--bg: #f6f7f9;
+	--surface: #ffffff;
+	--ink: #14181f;
+	--muted: #4f5968;
+	--line: #d3d8e0;
+	--brand: #0b5cad;
+	--brand-ink: #ffffff;
+	--ok: #1a7f4b;
+	--bad: #b3261e;
+	--warn: #8a5a00;
+	--font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+	--font-mono: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #0f1218;
+		--surface: #171c25;
+		--ink: #e8ebf0;
+		--muted: #a3adbc;
+		--line: #2a3140;
+		--brand: #5aa2ee;
+		--brand-ink: #0a0f17;
+		--ok: #4cc38a;
+		--bad: #ff7b72;
+		--warn: #e3b341;
+	}
+}
+@theme inline {
+	--color-bg: var(--bg);
+	--color-surface: var(--surface);
+	--color-ink: var(--ink);
+	--color-muted: var(--muted);
+	--color-line: var(--line);
+	--color-brand: var(--brand);
+	--color-brand-ink: var(--brand-ink);
+	--color-ok: var(--ok);
+	--color-bad: var(--bad);
+	--color-warn: var(--warn);
+}
+html {
+	color-scheme: light dark;
+}
+body {
+	background: var(--bg);
+	color: var(--ink);
+	font-family: var(--font-sans);
+	line-height: 1.6;
+}
+a {
+	color: var(--brand);
+}
+:focus-visible {
+	outline: 2px solid var(--brand);
+	outline-offset: 2px;
+}
+.prose-doc {
+	max-width: 75ch;
+}
+.prose-doc h1 { font-size: 1.75rem; font-weight: 700; margin: 1.2rem 0 0.6rem; }
+.prose-doc h2 { font-size: 1.3rem; font-weight: 650; margin: 1.6rem 0 0.5rem; border-bottom: 1px solid var(--line); padding-bottom: 0.25rem; }
+.prose-doc h3 { font-size: 1.1rem; font-weight: 650; margin: 1.2rem 0 0.4rem; }
+.prose-doc p, .prose-doc ul, .prose-doc ol, .prose-doc blockquote, .prose-doc table, .prose-doc pre { margin: 0.7rem 0; }
+.prose-doc ul { list-style: disc; padding-left: 1.4rem; }
+.prose-doc ol { list-style: decimal; padding-left: 1.4rem; }
+.prose-doc blockquote { border-left: 3px solid var(--line); padding-left: 0.9rem; color: var(--muted); }
+.prose-doc table { display: block; overflow-x: auto; border-collapse: collapse; }
+.prose-doc th, .prose-doc td { border: 1px solid var(--line); padding: 0.35rem 0.6rem; text-align: left; vertical-align: top; }
+.prose-doc code { font-family: var(--font-mono); font-size: 0.9em; background: color-mix(in srgb, var(--line) 50%, transparent); padding: 0.05rem 0.3rem; border-radius: 4px; }
+.prose-doc pre { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 0.8rem; }
+.prose-doc pre code { background: none; padding: 0; }
+@media (prefers-reduced-motion: reduce) {
+	* { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+}
+.xterm-screen { min-height: 320px; }
