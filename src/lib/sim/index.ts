@@ -4,7 +4,7 @@ import type { FsState } from './types.js';
 
 export * from './types.js';
 export { createInitialFs, pwd } from './filesystem.js';
-export { executeLine, listCommands, DEFAULT_ENV } from './commands.js';
+export { executeLine, listCommands, suggestCommand, capOutput, toXterm, DEFAULT_ENV } from './commands.js';
 export { LESSONS, getLesson, listLessons } from './lessons.js';
 export { parsePipeline, splitChain, tokenize, expandVars } from './parser.js';
 

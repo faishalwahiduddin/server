@@ -1,4 +1,5 @@
 import {
+	cloneState,
 	getNode,
 	listNames,
 	mkdir,
@@ -29,7 +30,12 @@ const KNOWN_COMMANDS = [
 	'man', 'help', 'history', 'exit'
 ];
 
-function capOutput(text: string): string {
+/** Convert LF newlines to xterm-style CRLF for terminal display. */
+export function toXterm(text: string): string {
+	return text.replace(/\r?\n/g, '\r\n');
+}
+
+export function capOutput(text: string): string {
 	const lines = text.split('\n');
 	let out = lines.length > MAX_LINES ? lines.slice(0, MAX_LINES).join('\n') + '\n… [truncated: output cap]' : text;
 	if (out.length > MAX_CHARS) out = out.slice(0, MAX_CHARS) + '\n… [truncated: output cap]';
@@ -53,7 +59,8 @@ function lsLong(state: FsState, path: string[], showAll: boolean): string {
 			const child = node.children.get(n);
 			if (!child) return n;
 			const size = child.kind === 'file' ? child.content.length : 4096;
-			return `${child.kind === 'dir' ? 'd' : '-'}${child.mode} user user ${String(size).padStart(6)} Jan  1 00:00 ${n}`;
+			const owner = child.owner ?? 'user';
+			return `${child.kind === 'dir' ? 'd' : '-'}${child.mode} ${owner} ${owner} ${String(size).padStart(6)} Jan  1 00:00 ${n}`;
 		});
 	if (showAll) rows.unshift('drwxr-xr-x user user   4096 Jan  1 00:00 .', 'drwxr-xr-x user user   4096 Jan  1 00:00 ..');
 	return rows.join('\n');
@@ -216,6 +223,51 @@ function applyGrep(args: string[], stdin: string, fixed: boolean, extended: bool
 	return { output: out, found: matched.length > 0 };
 }
 
+function editDistance(a: string, b: string): number {
+	const dp: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+	for (let j = 1; j <= b.length; j++) dp[0]![j] = j;
+	for (let i = 1; i <= a.length; i++) {
+		for (let j = 1; j <= b.length; j++) {
+			dp[i]![j] = Math.min(dp[i - 1]![j]! + 1, dp[i]![j - 1]! + 1, dp[i - 1]![j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+		}
+	}
+	return dp[a.length]![b.length]!;
+}
+
+/** Closest known command within a small typo budget, or null. */
+export function suggestCommand(cmd: string): string | null {
+	let best: string | null = null;
+	let bestD = Infinity;
+	for (const k of KNOWN_COMMANDS) {
+		const d = editDistance(cmd, k);
+		if (d < bestD) {
+			bestD = d;
+			best = k;
+		}
+	}
+	if (best === null) return null;
+	return bestD <= Math.max(2, Math.floor(cmd.length / 2)) ? best : null;
+}
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** Deterministic month calendar (pure function of month/year). Weeks start Sunday. */
+function calMonth(m: number, y: number): string {
+	const first = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+	const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+	const title = `${MONTH_NAMES[m - 1]} ${y}`;
+	const lines = [' '.repeat(Math.max(0, Math.floor((20 - title.length) / 2))) + title, 'Su Mo Tu We Th Fr Sa'];
+	let week = '   '.repeat(first);
+	for (let d = 1; d <= days; d++) {
+		week += String(d).padStart(2, ' ') + ' ';
+		if ((first + d) % 7 === 0 || d === days) {
+			lines.push(week.trimEnd());
+			week = '';
+		}
+	}
+	return lines.join('\n');
+}
+
 function executeStage(state: FsState, env: Record<string, string>, stage: ParsedStage, stdin: string): StageResult {
 	const args = stage.args.map((a) => expandVars(a, env));
 	const cmd = expandVars(stage.cmd, env);
@@ -264,10 +316,36 @@ function executeStage(state: FsState, env: Record<string, string>, stage: Parsed
 			return ok('uid=1000(user) gid=1000(user) groups=1000(user)');
 		case 'uname':
 			return ok(args.includes('-a') ? 'Linux server 6.8.0-sim x86_64 GNU/Linux (simulated)' : 'Linux');
-		case 'date':
-			return ok(new Date().toUTCString() + ' (simulated host clock)');
-		case 'cal':
-			return ok('    January 2026\nMo Tu We Th Fr Sa Su\n          1  2  3  4\n 5  6  7  8  9 10 11\n12 13 14 15 16 17 18\n19 20 21 22 23 24 25\n26 27 28 29 30 31 (simulated)');
+		case 'date': {
+			const fmt = args.find((a) => a.startsWith('+'));
+			if (fmt) {
+				return ok(
+					fmt
+						.slice(1)
+						.replace(/%Y/g, '2026')
+						.replace(/%m/g, '01')
+						.replace(/%d/g, '01')
+						.replace(/%H/g, '00')
+						.replace(/%M/g, '00')
+						.replace(/%S/g, '00')
+				);
+			}
+			return ok('Thu Jan  1 00:00:00 UTC 2026 (simulated clock)');
+		}
+		case 'cal': {
+			const nums = args.filter((a) => /^\d+$/.test(a)).map(Number);
+			let m = 1;
+			let y = 2026;
+			if (nums.length === 1 && nums[0] !== undefined) {
+				if (nums[0] >= 1 && nums[0] <= 12) m = nums[0];
+				else y = nums[0];
+			} else if (nums.length >= 2 && nums[0] !== undefined && nums[1] !== undefined) {
+				m = nums[0];
+				y = nums[1];
+			}
+			if (m < 1 || m > 12 || y < 1 || y > 9999) return fail('cal: invalid date');
+			return ok(calMonth(m, y));
+		}
 		case 'uptime':
 			return ok('00:00:00 up 42 days,  1 user,  load average: 0.00, 0.01, 0.05 (simulated)');
 		case 'df':
@@ -307,7 +385,11 @@ function executeStage(state: FsState, env: Record<string, string>, stage: Parsed
 			const p = target ? resolvePath(state.cwd, target) : state.cwd;
 			const node = getNode(state.root, p);
 			if (!node) return fail(`ls: cannot access '${target}': No such file or directory (simulated)`);
-			if (node.kind === 'file') return ok(long ? `-rw-r--r-- user user ${node.content.length} ${node.name}` : node.name);
+			if (node.kind === 'file') {
+				if (!long) return ok(node.name);
+				const owner = node.owner ?? 'user';
+				return ok(`-${node.mode} ${owner} ${owner} ${node.content.length} ${node.name}`);
+			}
 			if (long) return ok(lsLong(state, p, all));
 			const names = listNames(state, p) ?? [];
 			return ok(names.filter((n) => all || !n.startsWith('.')).join('  '));
@@ -320,13 +402,30 @@ function executeStage(state: FsState, env: Record<string, string>, stage: Parsed
 			return ok('', { ...state, cwd: p });
 		}
 		case 'mkdir': {
+			const recursive = args.includes('-p');
 			const dirs = args.filter((a) => !a.startsWith('-'));
 			if (dirs.length === 0) return fail('mkdir: missing operand');
 			let s = state;
 			for (const d of dirs) {
-				const next = mkdir(s, resolvePath(s.cwd, d));
-				if (!next) return fail(`mkdir: cannot create directory '${d}' (simulated)`);
-				s = next;
+				const abs = resolvePath(s.cwd, d);
+				if (!recursive) {
+					const next = mkdir(s, abs);
+					if (!next) return fail(`mkdir: cannot create directory '${d}': File exists`);
+					s = next;
+					continue;
+				}
+				const prefix: string[] = [];
+				for (const seg of abs) {
+					prefix.push(seg);
+					const node = getNode(s.root, prefix);
+					if (!node) {
+						const next = mkdir(s, prefix);
+						if (!next) return fail(`mkdir: cannot create directory '${d}'`);
+						s = next;
+					} else if (node.kind !== 'dir') {
+						return fail(`mkdir: cannot create directory '${d}': Not a directory`);
+					}
+				}
 			}
 			return ok('', s);
 		}
@@ -412,13 +511,42 @@ function executeStage(state: FsState, env: Record<string, string>, stage: Parsed
 		case 'cut': {
 			let delim = '\t';
 			let fields = '1';
+			const cutFiles: string[] = [];
 			for (let i = 0; i < args.length; i++) {
-				if (args[i] === '-d' && args[i + 1]) delim = args[i + 1];
-				if (args[i] === '-f' && args[i + 1]) fields = args[i + 1];
+				const a = args[i] ?? '';
+				if (a === '-d' && args[i + 1] !== undefined) {
+					delim = args[i + 1] ?? '\t';
+					i++;
+				} else if (a === '-f' && args[i + 1] !== undefined) {
+					fields = args[i + 1] ?? '1';
+					i++;
+				} else if (a.startsWith('-d') && a.length > 2) delim = a.slice(2);
+				else if (a.startsWith('-f') && a.length > 2) fields = a.slice(2);
+				else if (!a.startsWith('-')) cutFiles.push(a);
 			}
-			const text = args.some((a) => !a.startsWith('-') && a !== delim && a !== fields) ? '' : stdin;
-			const idx = fields.split(',').map((f) => Number(f) - 1);
-			return ok(text.split('\n').map((l) => l.split(delim).filter((_, i) => idx.includes(i)).join(delim)).join('\n'));
+			const idx = new Set<number>();
+			for (const part of fields.split(',')) {
+				const m = part.match(/^(\d*)-(\d*)$/);
+				if (m) {
+					const lo = m[1] === '' || m[1] === undefined ? 1 : Number(m[1]);
+					const hi = m[2] === '' || m[2] === undefined ? Number.MAX_SAFE_INTEGER : Number(m[2]);
+					for (let f = lo; f <= hi && f - lo < 1024; f++) idx.add(f - 1);
+				} else if (/^\d+$/.test(part)) idx.add(Number(part) - 1);
+			}
+			const pick = (text: string): string =>
+				text
+					.replace(/\n$/, '')
+					.split('\n')
+					.map((l) => l.split(delim).filter((_, i) => idx.has(i)).join(delim))
+					.join('\n');
+			if (cutFiles.length === 0) return ok(pick(stdin));
+			const out: string[] = [];
+			for (const f of cutFiles) {
+				const c = needFile(resolvePath(state.cwd, f));
+				if (c === null) return fail(`cut: ${f}: No such file or directory`);
+				out.push(pick(c));
+			}
+			return ok(out.join('\n'));
 		}
 		case 'grep':
 		case 'egrep':
@@ -437,7 +565,7 @@ function executeStage(state: FsState, env: Record<string, string>, stage: Parsed
 					out.push(`grep: ${f}: No such file (simulated)`);
 					continue;
 				}
-				const r = applyGrep([args[0]], c, fixed, cmd === 'egrep');
+				const r = applyGrep([files[0] ?? ''], c, fixed, cmd === 'egrep');
 				if (r.found) {
 					found = true;
 					out.push(r.output.split('\n').map((l) => `${f}:${l}`).join('\n'));
@@ -542,12 +670,62 @@ function executeStage(state: FsState, env: Record<string, string>, stage: Parsed
 			}
 			return ok('', s);
 		}
-		case 'chmod':
-		case 'chown':
-			return ok('');
-		case 'gzip':
-		case 'gunzip':
-			return ok('');
+		case 'chmod': {
+			const operands = args.filter((a) => !a.startsWith('-'));
+			const mode = operands[0];
+			const targets = operands.slice(1);
+			if (!mode || targets.length === 0) return fail('chmod: missing operand');
+			if (!/^[0-7]{3,4}$/.test(mode)) return fail(`chmod: invalid mode: '${mode}'`);
+			const next = cloneState(state);
+			for (const t of targets) {
+				const n = getNode(next.root, resolvePath(next.cwd, t));
+				if (!n) return fail(`chmod: cannot access '${t}': No such file or directory`);
+				n.mode = mode;
+			}
+			return ok('', next);
+		}
+		case 'chown': {
+			const operands = args.filter((a) => !a.startsWith('-'));
+			const owner = operands[0];
+			const targets = operands.slice(1);
+			if (!owner || targets.length === 0) return fail('chown: missing operand');
+			if (!/^[A-Za-z_][A-Za-z0-9_-]*$/.test(owner)) return fail(`chown: invalid user: '${owner}'`);
+			const next = cloneState(state);
+			for (const t of targets) {
+				const n = getNode(next.root, resolvePath(next.cwd, t));
+				if (!n) return fail(`chown: cannot access '${t}': No such file or directory`);
+				n.owner = owner;
+			}
+			return ok('', next);
+		}
+		case 'gzip': {
+			const f = args.find((a) => !a.startsWith('-'));
+			if (!f) return fail('gzip: missing operand');
+			if (f.endsWith('.gz')) return fail(`gzip: ${f} already has .gz suffix`);
+			const p = resolvePath(state.cwd, f);
+			const c = needFile(p);
+			if (c === null) return fail(`gzip: ${f}: No such file or directory`);
+			const w = writeFile(state, resolvePath(state.cwd, `${f}.gz`), `__GZ__:${c}`, false);
+			if (!w) return fail(`gzip: cannot create '${f}.gz'`);
+			const r = removePath(w, p, false);
+			if (!r) return fail(`gzip: cannot remove '${f}'`);
+			return ok('', r);
+		}
+		case 'gunzip': {
+			const f = args.find((a) => !a.startsWith('-'));
+			if (!f) return fail('gunzip: missing operand');
+			if (!f.endsWith('.gz')) return fail(`gunzip: ${f}: unknown suffix -- ignored`);
+			const p = resolvePath(state.cwd, f);
+			const c = needFile(p);
+			if (c === null) return fail(`gunzip: ${f}: No such file or directory`);
+			if (!c.startsWith('__GZ__:')) return fail(`gunzip: ${f}: not in gzip format`);
+			const dest = f.slice(0, -3);
+			const w = writeFile(state, resolvePath(state.cwd, dest), c.slice('__GZ__:'.length), false);
+			if (!w) return fail(`gunzip: cannot create '${dest}'`);
+			const r = removePath(w, p, false);
+			if (!r) return fail(`gunzip: cannot remove '${f}'`);
+			return ok('', r);
+		}
 		case 'fmt':
 			return ok(stdin.split(/\s+/).join('\n'));
 		case 'jobs':
@@ -574,8 +752,8 @@ function executeStage(state: FsState, env: Record<string, string>, stage: Parsed
 		case 'exit':
 			return ok('');
 		default: {
-			const suggestion = KNOWN_COMMANDS.find((k) => k.startsWith(cmd.slice(0, 2))) ?? 'ls';
-			return fail(`bash: ${cmd}: command not found (simulated). Try "${suggestion}".`);
+			const hint = suggestCommand(cmd);
+			return fail(`bash: ${cmd}: command not found${hint ? `. Did you mean '${hint}'?` : ''}`);
 		}
 	}
 }
@@ -606,13 +784,24 @@ export function executeLine(prevState: FsState, prevEnv: Record<string, string>,
 		const first = stages[0] as ParsedStage;
 		const inRedir = first.redirects.find((r) => r.op === '<');
 		if (inRedir) {
-			const content = readFile(state, resolvePath(state.cwd, inRedir.target));
-			if (content === null) {
-				outChunks.push(`bash: ${inRedir.target}: No such file (simulated)`);
-				lastCode = 1;
-				continue;
+			const abs = resolvePath(state.cwd, inRedir.target);
+			if (abs.length === 2 && abs[0] === 'dev' && abs[1] === 'null') {
+				stdin = '';
+			} else {
+				const content = readFile(state, abs);
+				if (content === null) {
+					outChunks.push(`bash: ${inRedir.target}: No such file (simulated)`);
+					lastCode = 1;
+					continue;
+				}
+				stdin = content;
 			}
-			stdin = content;
+		}
+		// `cmd 2>file`: a bare fd number before an output redirect is not an argument.
+		const tail = stages[stages.length - 1];
+		if (tail && tail.redirects.some((r) => r.op === '>' || r.op === '>>')) {
+			const lastArg = tail.args[tail.args.length - 1];
+			if (lastArg !== undefined && /^\d+$/.test(lastArg)) tail.args.pop();
 		}
 		let code = 0;
 		for (const stage of stages) {
@@ -628,13 +817,18 @@ export function executeLine(prevState: FsState, prevEnv: Record<string, string>,
 		const last = stages[stages.length - 1] as ParsedStage;
 		const outRedir = last.redirects.find((r) => r.op === '>' || r.op === '>>');
 		if (outRedir) {
-			const next = writeFile(state, resolvePath(state.cwd, outRedir.target), stdin + (stdin.endsWith('\n') ? '' : '\n'), outRedir.op === '>>');
-			if (!next) {
-				outChunks.push(`bash: ${outRedir.target}: cannot write (simulated)`);
-				code = 1;
-			} else {
-				state = next;
+			const abs = resolvePath(state.cwd, outRedir.target);
+			if (abs.length === 2 && abs[0] === 'dev' && abs[1] === 'null') {
 				stdin = '';
+			} else {
+				const next = writeFile(state, abs, stdin + (stdin.endsWith('\n') ? '' : '\n'), outRedir.op === '>>');
+				if (!next) {
+					outChunks.push(`bash: ${outRedir.target}: cannot write (simulated)`);
+					code = 1;
+				} else {
+					state = next;
+					stdin = '';
+				}
 			}
 		}
 		if (capOutput(stdin) !== stdin) stdin = capOutput(stdin);
