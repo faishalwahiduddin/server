@@ -6,7 +6,7 @@ Simulation-only app shell. SvelteKit 2 / Svelte 5 on Cloudflare Pages. Local-fir
 
 <!-- trace:begin start-here -->
 - **App**: `server` — placeholder shell for future server-side simulations.
-- **Port & URL**: dev `http://localhost:3034` (`vite dev --port 3034 --strictPort`) · produksi `https://server.faishal.id` (Pages project `server-faishal`)
+- **Port & URL**: dev `http://localhost:3036` (`vite dev --port 3036 --strictPort`) · produksi `https://server.faishal.id` (Pages project `server-faishal`)
 - **Branch**: `main` = produksi. Kerja di branch task.
 - **Cek**: `pnpm check` (typecheck) sebelum commit.
 - **CLI**: pakai `gh-faishal` dan `wrangler-faishal` — jangan bare `gh`/`wrangler`.

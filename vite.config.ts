@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	server: {
-		port: 3034,
+		port: 3036,
 		strictPort: true,
 		watch: { ignored: ['**/.svelte-kit/cloudflare/**', '**/.svelte-kit/output/**'] }
 	},

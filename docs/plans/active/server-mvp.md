@@ -4,11 +4,11 @@
 
 ## Goal
 
-Working SvelteKit 2 + Svelte 5 shell on Cloudflare Pages (`server-faishal`), dev port 3034, DNS `server.faishal.id` CNAME `server-faishal.pages.dev`. Simulation-only, zero backend execution.
+Working SvelteKit 2 + Svelte 5 shell on Cloudflare Pages (`server-faishal`), dev port 3036, DNS `server.faishal.id` CNAME `server-faishal.pages.dev`. Simulation-only, zero backend execution.
 
 ## Scaffold (done)
 
-- `package.json` — SvelteKit 2.57.1, Svelte 5.55.4, adapter-cloudflare 7.2.8, Vite 8.0.8, pnpm 10.34.1, Node >=22 <25, port 3034
+- `package.json` — SvelteKit 2.57.1, Svelte 5.55.4, adapter-cloudflare 7.2.8, Vite 8.0.8, pnpm 10.34.1, Node >=22 <25, port 3036
 - `svelte.config.js` — adapter-cloudflare + platformProxy `wrangler.toml`
 - `wrangler.toml` — Pages project `server-faishal`, compatibility_date 2026-07-19 + nodejs_compat, no bindings
 - `scripts/deploy.sh` — check + build + `wrangler-faishal pages deploy`

@@ -9,9 +9,9 @@
 	},
 	"scripts": {
 		"preinstall": "npx only-allow pnpm",
-		"dev": "vite dev --port 3034 --strictPort",
+		"dev": "vite dev --port 3036 --strictPort",
 		"build": "vite build",
-		"preview": "vite preview --port 3034 --strictPort",
+		"preview": "vite preview --port 3036 --strictPort",
 		"typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check": "pnpm typecheck",
 		"test": "vitest run",

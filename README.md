@@ -56,7 +56,7 @@ pnpm check    # svelte-check typecheck gate (must pass before commit)
 pnpm test     # vitest unit tests
 ```
 
-The dev server (`pnpm dev --port 3034`) and production builds are only run on explicit request per fleet convention. Deploy is manual, never CI:
+The dev server (`pnpm dev --port 3036`) and production builds are only run on explicit request per fleet convention. Deploy is manual, never CI:
 
 ```bash
 pnpm deploy   # → wrangler pages deploy --project-name server-faishal
