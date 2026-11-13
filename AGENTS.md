@@ -22,6 +22,14 @@ Simulation-only app shell. SvelteKit 2 / Svelte 5 on Cloudflare Pages. Local-fir
 - `src/routes/+page.svelte` — placeholder. No forms yet.
 - Plan: `docs/plans/active/`; changelog: `docs/changelog/YYYY/MM/`.
 
+## Design Systems
+
+Token dan komponen UI bersumber dari [`DESIGN.md`](./DESIGN.md) dan [`docs/reference/design-system/`](./docs/reference/design-system/) (token di `src/app.css`, Tailwind v4).
+
+- Pakai utilitas semantik (`bg-surface`, `text-ink`, `border-line`, `bg-brand`, …); jangan hardcode hex di markup (§DS-3).
+- Pola reusable baru → dokumentasikan di `docs/reference/design-system/` dalam task yang sama.
+- Aksesibilitas WCAG AA (§DS-6): fokus terlihat, target sentuh ≥ 44px, hormati `prefers-reduced-motion`.
+
 ## Rules
 
 - Local-first, no accounts, no backend execution.
